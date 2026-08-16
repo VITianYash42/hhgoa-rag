@@ -124,4 +124,6 @@ with gr.Blocks(css=CSS, title="HH Goa 2026 — Voice RAG") as demo:
     bench_btn.click(fn=run_benchmark_from_space, inputs=[n_input], outputs=[bench_output])
 
 if __name__ == "__main__":
-    demo.launch()
+    import os
+    port = int(os.environ.get("PORT", 7860))
+    demo.launch(server_name="0.0.0.0", server_port=port)

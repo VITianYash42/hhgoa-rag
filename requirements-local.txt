@@ -1,0 +1,4 @@
+# Only needed to run src/data_prep.py locally (one-time, offline dataset prep).
+# NOT installed on Render - keeps the deployed app's memory footprint small.
+-r requirements.txt
+datasets>=2.19.0

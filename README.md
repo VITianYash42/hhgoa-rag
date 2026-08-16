@@ -47,6 +47,23 @@ At query time (`src/retrieval.py`), all three indices are queried and results po
 
 Deliberately rule-based, not a second LLM call — an extra model call would eat the 200ms budget on its own and is harder to defend numerically in a benchmark writeup than deterministic thresholds.
 
+## Retrieval backend: TF-IDF, not neural embeddings
+
+`index_build.py` / `retrieval.py` use scikit-learn TF-IDF vectors, not `sentence-transformers`.
+Deliberate call: neural embeddings pull in PyTorch (2-3GB download), infeasible on limited
+bandwidth. TF-IDF is still real vector-space retrieval — sparse vectors, cosine similarity —
+just word-overlap-based rather than semantic. Total install is ~150-250MB instead of 2-3GB.
+State this trade-off explicitly in the submission writeup; it's a defensible engineering
+decision under a real constraint, not a hidden shortcut.
+
+## Latency benchmark - reporting guidance (read before submitting numbers)
+
+Local dev-machine benchmark runs measure network round-trip time to Groq's API over *your* internet connection, not the pipeline's actual latency. On a slow connection this can show 5+ second generation latency even though retrieval (FAISS, fully local) is under 10ms — proof the bottleneck is network RTT, not the pipeline logic.
+
+**Get your real submission numbers from the deployed HF Space, not your laptop.** `app.py` includes a "Run benchmark" button at the bottom of the UI specifically for this — once deployed, click it there. Cloud-to-cloud latency from HF Spaces to Groq is dramatically lower than from a home connection and is the representative number a grader should see.
+
+If the deployed number still misses the 200ms target, report it honestly alongside the retrieval-only number (which will be fast) — a transparent "retrieval is Xms, generation network RTT is the dominant cost, here's why" is a stronger submission than silently hitting an unrealistic target.
+
 ## Setup
 
 ```bash
@@ -61,7 +78,7 @@ export GROQ_API_KEY=...
 # 2. Build the corpus + indices (run once, ~5-15 min depending on machine)
 cd src
 python data_prep.py       # downloads dataset sample, builds corpus.json + eval_set.json
-python index_build.py     # embeds + builds FAISS indices for all 3 strategies
+python index_build.py     # builds TF-IDF indices for all 3 strategies (fast, no GPU/torch)
 
 # 3. Run the latency benchmark (P50/P70/P100, required for submission)
 python benchmark.py --n 50

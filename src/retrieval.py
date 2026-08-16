@@ -1,76 +1,63 @@
 """
-Loads all three per-strategy FAISS indices and exposes a single retrieve()
-call that queries each, then merges results by score. This is the
-"multiple chunking strategies, not one naive split" requirement made
-concrete: at query time we don't commit to one strategy, we pool candidates
-from all three and let score decide, tagging which strategy each hit came
-from (useful for the latency/quality writeup).
+Loads all three per-strategy TF-IDF indices and exposes a single retrieve()
+call that queries each, then merges results by cosine similarity score.
+Multiple chunking strategies pooled at query time, not committed to one -
+same design as the neural version, just swapped the embedding backend for
+scikit-learn TF-IDF (see index_build.py for why).
 """
 import pickle
 from pathlib import Path
 from functools import lru_cache
 
-import numpy as np
-import faiss
-from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-
-_model = None
-
-
-def get_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
-    return _model
 
 
 @lru_cache(maxsize=1)
 def load_indices():
     indices = {}
     for strategy in ("fixed", "semantic", "metaaware"):
-        index_path = DATA_DIR / f"index_{strategy}.faiss"
+        tfidf_path = DATA_DIR / f"tfidf_{strategy}.pkl"
         chunks_path = DATA_DIR / f"chunks_{strategy}.pkl"
-        if not index_path.exists():
+        if not tfidf_path.exists():
             continue
-        index = faiss.read_index(str(index_path))
+        with open(tfidf_path, "rb") as f:
+            tfidf_data = pickle.load(f)
         with open(chunks_path, "rb") as f:
             chunks = pickle.load(f)
-        indices[strategy] = (index, chunks)
+        indices[strategy] = (tfidf_data["vectorizer"], tfidf_data["matrix"], chunks)
     return indices
 
 
 def retrieve(query: str, top_k_per_strategy: int = 5, final_k: int = 5) -> list[dict]:
     """
-    Query every strategy's index, pool results, sort by score, return top final_k.
+    Query every strategy's TF-IDF index, pool results, sort by cosine
+    similarity, return top final_k.
     Each result: {text, score, strategy, chunk_id, is_selected_anywhere}
     """
     indices = load_indices()
     if not indices:
-        raise RuntimeError("No indices found. Run `python -m src.index_build` first.")
-
-    model = get_model()
-    q_emb = model.encode([query], convert_to_numpy=True, normalize_embeddings=True).astype("float32")
+        raise RuntimeError("No indices found. Run `python index_build.py` first.")
 
     pooled = []
-    for strategy, (index, chunks) in indices.items():
-        scores, idxs = index.search(q_emb, top_k_per_strategy)
-        for score, idx in zip(scores[0], idxs[0]):
-            if idx < 0 or idx >= len(chunks):
+    for strategy, (vectorizer, matrix, chunks) in indices.items():
+        q_vec = vectorizer.transform([query])
+        sims = cosine_similarity(q_vec, matrix)[0]
+        top_idx = sims.argsort()[::-1][:top_k_per_strategy]
+        for idx in top_idx:
+            score = float(sims[idx])
+            if score <= 0:
                 continue
             chunk = chunks[idx]
             pooled.append({
                 "text": chunk["text"],
-                "score": float(score),
+                "score": score,
                 "strategy": strategy,
                 "chunk_id": chunk["id"],
                 "is_selected_anywhere": chunk.get("metadata", {}).get("is_selected_anywhere", False),
             })
 
-    # dedupe near-identical text across strategies (metaaware often overlaps semantic),
-    # keep the highest-scoring copy
     seen_text = {}
     for r in pooled:
         key = r["text"][:120]

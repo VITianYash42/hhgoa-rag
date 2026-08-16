@@ -1,22 +1,27 @@
 """
-Embeds every chunk (per strategy) with a local sentence-transformers model
-(free, CPU-friendly, no API cost) and builds one FAISS index per strategy.
-Run after data_prep.py.
+Builds a TF-IDF vector index per chunking strategy - NOT a neural embedding
+model. Deliberate trade-off: sentence-transformers pulls in PyTorch, a
+2-3GB download, which is infeasible on poor internet. TF-IDF is still real
+vector-space retrieval (sparse vectors, cosine similarity) and needs only
+scikit-learn (~150MB total including scipy/numpy) - no GPU/neural stack.
 
-Usage: python -m src.index_build
+Cost of this trade-off: TF-IDF matches on word overlap, not semantic
+meaning, so it won't catch heavily paraphrased questions as well as a
+neural embedding model would. State this explicitly in the submission -
+it's a defensible engineering call under a real bandwidth constraint, not
+a hidden shortcut.
+
+Run after data_prep.py. Usage: python index_build.py
 """
 import json
 import pickle
 from pathlib import Path
 
-import numpy as np
-import faiss
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from chunking import build_all_chunks
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # small, fast, free, CPU-friendly
 
 
 def main():
@@ -28,24 +33,23 @@ def main():
     for name, chunks in all_chunks.items():
         print(f"  {name}: {len(chunks)} chunks")
 
-    print(f"Loading embedding model: {MODEL_NAME}")
-    model = SentenceTransformer(MODEL_NAME)
-
     for strategy, chunks in all_chunks.items():
         texts = [c["text"] for c in chunks]
-        print(f"Embedding {len(texts)} chunks for strategy '{strategy}'...")
-        embeddings = model.encode(
-            texts, batch_size=64, show_progress_bar=True,
-            convert_to_numpy=True, normalize_embeddings=True,
-        ).astype("float32")
+        print(f"Fitting TF-IDF vectorizer for strategy '{strategy}' ({len(texts)} chunks)...")
 
-        index = faiss.IndexFlatIP(embeddings.shape[1])  # cosine sim via normalized IP
-        index.add(embeddings)
+        vectorizer = TfidfVectorizer(
+            max_features=50000,
+            ngram_range=(1, 2),
+            stop_words="english",
+            sublinear_tf=True,
+        )
+        matrix = vectorizer.fit_transform(texts)
 
-        faiss.write_index(index, str(DATA_DIR / f"index_{strategy}.faiss"))
+        with open(DATA_DIR / f"tfidf_{strategy}.pkl", "wb") as f:
+            pickle.dump({"vectorizer": vectorizer, "matrix": matrix}, f)
         with open(DATA_DIR / f"chunks_{strategy}.pkl", "wb") as f:
             pickle.dump(chunks, f)
-        print(f"  Saved index_{strategy}.faiss and chunks_{strategy}.pkl")
+        print(f"  Saved tfidf_{strategy}.pkl and chunks_{strategy}.pkl")
 
     print("Done. Indices ready for retrieval.py")
 

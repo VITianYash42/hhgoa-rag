@@ -28,7 +28,11 @@ UNSAFE_PATTERNS = [
     r"\bkill (myself|yourself)\b",
 ]
 
-MIN_RETRIEVAL_SCORE = 0.25          # cosine sim below this -> refuse, context too weak
+MIN_RETRIEVAL_SCORE = 0.12          # TF-IDF cosine sim below this -> refuse, context too weak
+                                     # (lower than a neural-embedding threshold would be -
+                                     # TF-IDF cosine scores run smaller since they're sparse
+                                     # word-overlap vectors, not dense semantic ones. Tune
+                                     # this against your own eval_set after benchmarking.)
 MIN_GROUNDING_OVERLAP = 0.08        # fraction of answer content-words present in context
 REFUSAL_TEXT = "I don't have enough information in the retrieved context to answer that."
 

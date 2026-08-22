@@ -20,7 +20,74 @@ import gradio as gr
 from harness import run_pipeline
 
 CSS = """
-.gradio-container {font-family: 'Courier New', monospace;}
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+
+:root {
+  --hhgoa-green: #1a5c3e;
+  --hhgoa-green-dark: #0f3d29;
+  --hhgoa-pink: #e8177d;
+  --hhgoa-cream: #faf3e0;
+  --hhgoa-yellow: #f2c94c;
+}
+
+.gradio-container {
+  font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+  background: var(--hhgoa-cream) !important;
+}
+
+#component-0, .main {
+  background: var(--hhgoa-cream) !important;
+}
+
+h1, h2, h3, .prose h1, .prose h2, .prose h3 {
+  color: var(--hhgoa-green-dark) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+
+.prose p {
+  color: var(--hhgoa-green-dark) !important;
+}
+
+button.primary, button[variant="primary"] {
+  background: var(--hhgoa-pink) !important;
+  border: 2px solid var(--hhgoa-pink) !important;
+  color: var(--hhgoa-cream) !important;
+  font-weight: 700 !important;
+  border-radius: 999px !important;
+  letter-spacing: 0.02em;
+}
+
+button.secondary, button[variant="secondary"] {
+  background: var(--hhgoa-green) !important;
+  border: 2px solid var(--hhgoa-green) !important;
+  color: var(--hhgoa-cream) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+
+.block, .form {
+  border: 2px solid var(--hhgoa-green) !important;
+  border-radius: 16px !important;
+  background: white !important;
+}
+
+textarea, input[type=text], input[type=number] {
+  border: 2px dashed var(--hhgoa-pink) !important;
+  border-radius: 10px !important;
+  background: var(--hhgoa-cream) !important;
+  color: var(--hhgoa-green-dark) !important;
+}
+
+label span {
+  color: var(--hhgoa-green-dark) !important;
+  font-weight: 700 !important;
+}
+
+hr {
+  border-color: var(--hhgoa-pink) !important;
+  border-style: dashed !important;
+}
 """
 
 
@@ -109,7 +176,10 @@ def run_benchmark_from_space(n_queries):
 
 
 with gr.Blocks(css=CSS, title="HH Goa 2026 — Voice RAG") as demo:
-    gr.Markdown("# 🎙️ Voice-Enabled RAG — HH Goa 2026")
+    gr.Markdown(
+        "<p style='color:#e8177d; font-size:12px; letter-spacing:0.14em; font-weight:700; margin-bottom:2px;'>TASK #2 · #RAGInGoa</p>"
+        "\n# 🎙️ Voice-Enabled RAG — HH Goa 2026"
+    )
     gr.Markdown("Speak a question (or type one to skip STT). Answers are grounded strictly "
                 "in retrieved context — if the pipeline isn't confident, it says so instead of guessing.")
 

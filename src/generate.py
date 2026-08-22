@@ -8,7 +8,7 @@ import os
 import time
 from groq import Groq
 
-MODEL = "llama-3.1-8b-instant"
+MODEL = "openai/gpt-oss-20b"  # llama-3.1-8b-instant was deprecated by Groq (June 2026); this is their recommended replacement, same speed/cost tier
 
 SYSTEM_PROMPT = """You are a grounded QA assistant. You MUST answer using ONLY the provided context passages.
 Rules:

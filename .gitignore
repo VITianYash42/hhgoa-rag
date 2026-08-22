@@ -1,8 +1,0 @@
-__pycache__/
-*.pyc
-.env
-data/*.faiss
-data/*.pkl
-data/corpus.json
-data/eval_set.json
-data/benchmark_results.json

@@ -44,6 +44,7 @@ def handle_query(audio, typed_text):
     meta = (
         f"status: {result.status}"
         + (f" ({result.block_reason})" if result.block_reason else "")
+        + (f"\nERROR: {result.error}" if result.error else "")
         + f"\nretrieval: {timing.retrieval_ms:.0f}ms | generation: {timing.generation_ms:.0f}ms"
         + f" | total: {timing.total_ms:.0f}ms"
     )
@@ -73,6 +74,7 @@ def run_benchmark_from_space(n_queries):
 
     retrieval_lat, generation_lat, total_lat = [], [], []
     statuses = {}
+    sample_errors = []
 
     for row in queries:
         result = run_pipeline(query_text=row["query"])
@@ -81,6 +83,8 @@ def run_benchmark_from_space(n_queries):
             generation_lat.append(result.timing.generation_ms)
         total_lat.append(result.timing.total_ms)
         statuses[result.status] = statuses.get(result.status, 0) + 1
+        if result.error and len(sample_errors) < 3:
+            sample_errors.append(result.error)
 
     def pct(values, p):
         if not values:
@@ -94,6 +98,10 @@ def run_benchmark_from_space(n_queries):
         lines.append(f"{name:12s}  P50={pct(vals,50):7.1f}ms  P70={pct(vals,70):7.1f}ms  "
                       f"P100={pct(vals,100):7.1f}ms  mean={statistics.mean(vals) if vals else 0:7.1f}ms  n={len(vals)}")
     lines.append(f"\nStatus: {statuses}")
+    if sample_errors:
+        lines.append("\nSample errors (first 3):")
+        for e in sample_errors:
+            lines.append(f"  - {e}")
     under_200 = sum(1 for t in total_lat if t < 200)
     lines.append(f"{under_200}/{len(total_lat)} ({100*under_200/len(total_lat):.1f}%) under 200ms end-to-end.")
 
